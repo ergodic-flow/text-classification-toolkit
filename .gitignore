@@ -1,0 +1,10 @@
+/target
+*.bin
+*.model
+*.tsv
+*.csv
+*.tar.gz
+*.txt
+*.id
+.DS_Store
+.idea/
