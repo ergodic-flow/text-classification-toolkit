@@ -45,12 +45,11 @@ impl PlattCalibrator {
     }
 
     pub fn transform(&self, raw_scores: &[f64]) -> Vec<f64> {
-        let mut calibrated: Vec<f64> = self
-            .params
-            .iter()
-            .zip(raw_scores.iter())
-            .map(|(&(a, b), &s)| sigmoid(a * s + b))
-            .collect();
+        self.transform_multiclass(raw_scores)
+    }
+
+    pub fn transform_multiclass(&self, raw_scores: &[f64]) -> Vec<f64> {
+        let mut calibrated = self.transform_independent(raw_scores);
 
         if self.n_classes > 1 {
             let sum: f64 = calibrated.iter().sum();
@@ -62,6 +61,18 @@ impl PlattCalibrator {
         }
 
         calibrated
+    }
+
+    pub fn transform_multilabel(&self, raw_scores: &[f64]) -> Vec<f64> {
+        self.transform_independent(raw_scores)
+    }
+
+    fn transform_independent(&self, raw_scores: &[f64]) -> Vec<f64> {
+        self.params
+            .iter()
+            .zip(raw_scores.iter())
+            .map(|(&(a, b), &s)| sigmoid(a * s + b))
+            .collect()
     }
 
     pub fn n_classes(&self) -> usize {

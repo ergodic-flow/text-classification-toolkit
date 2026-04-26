@@ -40,7 +40,10 @@ impl Model {
     pub fn predict_features_proba(&self, features: &[(usize, f64)]) -> Vec<f64> {
         let raw = self.classifier.predict_proba(features);
         match &self.calibrator {
-            Some(cal) => cal.transform(&raw),
+            Some(cal) => match &self.classifier {
+                Classifier::OvaSgd(_) | Classifier::OvaLbfgs(_) => cal.transform_multilabel(&raw),
+                _ => cal.transform_multiclass(&raw),
+            },
             None => raw,
         }
     }
@@ -125,7 +128,7 @@ fn text_toolkit(m: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::classifier::{Objective, SgdClassifier};
+    use crate::classifier::{Objective, OvaClassifier, SgdClassifier};
 
     #[test]
     fn binary_predict_uses_calibrated_probability() {
@@ -171,5 +174,24 @@ mod tests {
         let probs = model.predict_proba("");
         assert!(probs[1] > probs[0]);
         assert_eq!(model.predict(""), 1);
+    }
+
+    #[test]
+    fn multilabel_calibration_keeps_independent_probabilities() {
+        let mut classifier = OvaClassifier::<SgdClassifier>::new(0, 2);
+        classifier.classifiers[0].biases[0] = 4.0;
+        classifier.classifiers[1].biases[0] = 4.0;
+
+        let model = Model {
+            tfidf: TfIdf::new(),
+            classifier: Classifier::OvaSgd(classifier),
+            calibrator: Some(calibration::PlattCalibrator::new(2)),
+        };
+
+        let probs = model.predict_proba("");
+        assert!(probs[0] > 0.5);
+        assert!(probs[1] > 0.5);
+        assert!(probs.iter().sum::<f64>() > 1.0);
+        assert_eq!(model.predict_features_labels(&[]), vec![0, 1]);
     }
 }
