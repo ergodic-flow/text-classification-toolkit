@@ -421,7 +421,10 @@ fn do_train(args: &cli::TrainArgs) {
 fn do_predict(args: &cli::PredictArgs) {
     let model = load_model(&args.model);
 
-    let data = read_tsv(&args.input);
+    let input = fs::File::open(&args.input).unwrap_or_else(|e| {
+        eprintln!("error opening {}: {}", args.input, e);
+        std::process::exit(1);
+    });
 
     let out: Box<dyn Write> = match &args.output {
         Some(path) => Box::new(fs::File::create(path).unwrap()),
@@ -430,33 +433,30 @@ fn do_predict(args: &cli::PredictArgs) {
 
     let mut writer = std::io::BufWriter::new(out);
 
-    let n_classes = model.classifier.n_classes();
     let is_binary = model.classifier.is_binary();
     let has_calibrator = model.calibrator.is_some();
 
-    if is_binary {
-        writeln!(writer, "label\tprobability").unwrap();
-    } else {
-        let headers: Vec<String> = (0..n_classes).map(|k| format!("prob_{}", k)).collect();
-        writeln!(writer, "label\t{}", headers.join("\t")).unwrap();
-    }
+    writeln!(writer, "label\tprobability").unwrap();
 
-    for (_label, text) in &data {
-        let features = model.tfidf.transform(text);
+    let mut n_samples = 0;
+    for line in std::io::BufReader::new(input).lines() {
+        let text = line.unwrap();
+        let features = model.tfidf.transform(&text);
         let pred = model.classifier.predict(&features);
         let probs = model.predict_proba(&features);
-
-        if is_binary {
-            writeln!(writer, "{}\t{:.6}", pred, probs[0]).unwrap();
+        let probability = if is_binary {
+            if pred == 1 { probs[0] } else { 1.0 - probs[0] }
         } else {
-            let prob_strs: Vec<String> = probs.iter().map(|p| format!("{:.6}", p)).collect();
-            writeln!(writer, "{}\t{}", pred, prob_strs.join("\t")).unwrap();
-        }
+            probs[pred]
+        };
+
+        writeln!(writer, "{}\t{:.6}", pred, probability).unwrap();
+        n_samples += 1;
     }
 
     eprintln!(
         "predicted: {} samples from {}{}",
-        data.len(),
+        n_samples,
         args.model,
         if has_calibrator { " [calibrated]" } else { "" },
     );
