@@ -7,6 +7,7 @@ use std::fs;
 
 use classifier::Classifier;
 use pyo3::prelude::*;
+use pyo3::types::PyList;
 use tfidf::TfIdf;
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -35,6 +36,11 @@ impl Model {
     pub fn predict_proba(&self, text: &str) -> Vec<f64> {
         let features = self.tfidf.transform(text);
         self.predict_features_proba(&features)
+    }
+
+    pub fn predict_labels(&self, text: &str) -> Vec<usize> {
+        let features = self.tfidf.transform(text);
+        self.predict_features_labels(&features)
     }
 
     pub fn predict_features_proba(&self, features: &[(usize, f64)]) -> Vec<f64> {
@@ -120,12 +126,28 @@ impl PyModel {
         Ok(Self { model })
     }
 
-    fn predict(&self, text: &str) -> usize {
-        self.model.predict(text)
+    fn predict(&self, py: Python<'_>, text: &str) -> PyResult<Py<PyAny>> {
+        match &self.model.classifier {
+            Classifier::OvaSgd(_) | Classifier::OvaLbfgs(_) => {
+                Ok(PyList::new(py, self.model.predict_labels(text))?
+                    .into_any()
+                    .unbind())
+            }
+            _ => Ok(self
+                .model
+                .predict(text)
+                .into_pyobject(py)?
+                .into_any()
+                .unbind()),
+        }
     }
 
     fn predict_proba(&self, text: &str) -> Vec<f64> {
         self.model.predict_proba(text)
+    }
+
+    fn predict_labels(&self, text: &str) -> Vec<usize> {
+        self.model.predict_labels(text)
     }
 
     fn n_classes(&self) -> usize {
@@ -134,6 +156,13 @@ impl PyModel {
 
     fn is_binary(&self) -> bool {
         self.model.classifier.is_binary()
+    }
+
+    fn is_multilabel(&self) -> bool {
+        matches!(
+            self.model.classifier,
+            Classifier::OvaSgd(_) | Classifier::OvaLbfgs(_)
+        )
     }
 
     fn is_calibrated(&self) -> bool {
@@ -221,5 +250,29 @@ mod tests {
         assert_eq!(predictions[1].0, 1);
         assert!(predictions[0].1 > 0.5);
         assert!(predictions[1].1 > 0.5);
+        assert_eq!(model.predict_labels(""), vec![0, 1]);
+    }
+
+    #[test]
+    fn python_predict_returns_list_for_multilabel_models() {
+        Python::initialize();
+        Python::attach(|py| {
+            let mut classifier = OvaClassifier::<SgdClassifier>::new(0, 2);
+            classifier.classifiers[0].biases[0] = 4.0;
+            classifier.classifiers[1].biases[0] = 4.0;
+
+            let py_model = PyModel {
+                model: Model {
+                    tfidf: TfIdf::new(),
+                    classifier: Classifier::OvaSgd(classifier),
+                    calibrator: None,
+                },
+            };
+
+            let prediction = py_model.predict(py, "").unwrap();
+            assert_eq!(prediction.extract::<Vec<usize>>(py).unwrap(), vec![0, 1]);
+            assert_eq!(py_model.predict_labels(""), vec![0, 1]);
+            assert!(py_model.is_multilabel());
+        });
     }
 }

@@ -990,7 +990,27 @@ fn do_repl(args: &cli::ReplArgs) {
         let (pred, probs) = model.predict_features_with_proba(&features);
         let mut contribs = model.classifier.feature_contributions(&features);
 
-        if model.classifier.is_binary() {
+        if matches!(
+            model.classifier,
+            Classifier::OvaSgd(_) | Classifier::OvaLbfgs(_)
+        ) {
+            let labels = model.predict_features_labels_with_proba(&features);
+            let label_strs: Vec<String> = labels
+                .iter()
+                .map(|(label, prob)| format!("{}:{:.4}", label, prob))
+                .collect();
+            let prob_strs: Vec<String> = probs
+                .iter()
+                .enumerate()
+                .map(|(k, p)| format!("{}:{:.4}", k, p))
+                .collect();
+            let predicted = if label_strs.is_empty() {
+                "(none)".to_string()
+            } else {
+                label_strs.join(", ")
+            };
+            println!("predicted: {} [all: {}]", predicted, prob_strs.join("  "));
+        } else if model.classifier.is_binary() {
             let probability = if pred == 1 { probs[0] } else { 1.0 - probs[0] };
             println!("predicted: {} (prob: {:.4})", pred, probability);
         } else {

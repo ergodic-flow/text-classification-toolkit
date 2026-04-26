@@ -54,12 +54,19 @@ model = Model("model.bin")
 
 label = model.predict("some text to classify")
 probabilities = model.predict_proba("some text to classify")
+labels = model.predict_labels("some text to classify")
 
 print(label)
 print(probabilities)
+print(labels)
 ```
 
-The wrapper also exposes `n_classes()`, `is_binary()`, and `is_calibrated()`.
+For binary and multiclass models, `predict()` returns a single integer label. For
+OvA multilabel models, `predict()` returns a list of labels whose probabilities
+are at least `0.5`. Use `predict_labels()` when you always want a list.
+
+The wrapper also exposes `n_classes()`, `is_binary()`, `is_multilabel()`, and
+`is_calibrated()`.
 
 ## Why?
 
