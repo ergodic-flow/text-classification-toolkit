@@ -3,10 +3,18 @@ name = "text-toolkit"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+name = "text_toolkit"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+extension-module = ["pyo3/extension-module"]
+
 [dependencies]
 bincode = "1"
 clap = { version = "4", features = ["derive"] }
 hashbrown = { version = "0.17.0", features = ["serde"] }
 indicatif = "0.18.4"
+pyo3 = { version = "0.27.1", features = ["abi3-py38"] }
 rand = "0.10.1"
 serde = { version = "1", features = ["derive"] }

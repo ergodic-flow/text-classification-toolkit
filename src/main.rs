@@ -1,8 +1,5 @@
-mod calibration;
-mod classifier;
 mod cli;
 mod metrics;
-mod tfidf;
 //mod iterstrat; // UNUSED FOR NOW LEAVE IT ALONE
 
 use std::fs;
@@ -14,34 +11,16 @@ use clap::Parser;
 use rand::rng;
 use rand::seq::{IndexedRandom, SliceRandom};
 
-use classifier::{Classifier, LbfgsClassifier, Objective, OvaClassifier, SgdClassifier};
 use metrics::ClassificationReport;
-use tfidf::TfIdf;
-
-#[derive(serde::Serialize, serde::Deserialize)]
-struct Model {
-    tfidf: TfIdf,
-    classifier: Classifier,
-    calibrator: Option<calibration::PlattCalibrator>,
-}
-
-impl Model {
-    fn predict_proba(&self, features: &[(usize, f64)]) -> Vec<f64> {
-        let raw = self.classifier.predict_proba(features);
-        match &self.calibrator {
-            Some(cal) => cal.transform(&raw),
-            None => raw,
-        }
-    }
-}
+use text_toolkit::classifier::{
+    Classifier, LbfgsClassifier, Objective, OvaClassifier, SgdClassifier,
+};
+use text_toolkit::tfidf::TfIdf;
+use text_toolkit::{Model, calibration, load_model as try_load_model};
 
 fn load_model(path: &str) -> Model {
-    let bytes = fs::read(path).unwrap_or_else(|e| {
+    try_load_model(path).unwrap_or_else(|e| {
         eprintln!("error loading model '{}': {}", path, e);
-        std::process::exit(1);
-    });
-    bincode::deserialize::<Model>(&bytes).unwrap_or_else(|e| {
-        eprintln!("error deserializing model '{}': {}", path, e);
         std::process::exit(1);
     })
 }
@@ -443,7 +422,7 @@ fn do_predict(args: &cli::PredictArgs) {
         let text = line.unwrap();
         let features = model.tfidf.transform(&text);
         let pred = model.classifier.predict(&features);
-        let probs = model.predict_proba(&features);
+        let probs = model.predict_features_proba(&features);
         let probability = if is_binary {
             if pred == 1 { probs[0] } else { 1.0 - probs[0] }
         } else {
@@ -1008,7 +987,7 @@ fn do_repl(args: &cli::ReplArgs) {
 
         let features = model.tfidf.transform(text);
         let pred = model.classifier.predict(&features);
-        let probs = model.predict_proba(&features);
+        let probs = model.predict_features_proba(&features);
         let mut contribs = model.classifier.feature_contributions(&features);
 
         if model.classifier.is_binary() {

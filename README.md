@@ -12,6 +12,54 @@ A lightweight CLI-based toolkit for: binary, multiclass, multilabel text classif
 - a simple TSV format for training
 - class and sample weighting
 - explicit support for binary, multiclass, and multilabel problems.
+- a thin Python wrapper for invoking trained models
+
+## CLI Usage
+
+Train and evaluate use TSV files with a header and `label\ttext` rows.
+
+Predict accepts unlabeled input: one text document per line. It writes TSV output
+to stdout by default, or to `--output` when provided:
+
+```sh
+text-toolkit predict --model model.bin --input unlabeled.txt
+text-toolkit predict --model model.bin --input unlabeled.txt --output predictions.tsv
+```
+
+Prediction output is always:
+
+```text
+label	probability
+```
+
+`probability` is the probability assigned to the predicted label.
+
+## Python Wrapper
+
+The crate also builds a small PyO3 module for loading and invoking trained
+models from Python. Install it with maturin or pip from the repository root:
+
+```sh
+maturin develop
+# or
+pip install .
+```
+
+Then load a serialized model and run predictions:
+
+```python
+from text_toolkit import Model
+
+model = Model("model.bin")
+
+label = model.predict("some text to classify")
+probabilities = model.predict_proba("some text to classify")
+
+print(label)
+print(probabilities)
+```
+
+The wrapper also exposes `n_classes()`, `is_binary()`, and `is_calibrated()`.
 
 ## Why?
 
