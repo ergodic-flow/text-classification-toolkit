@@ -14,6 +14,15 @@ A lightweight CLI-based toolkit for: binary, multiclass, multilabel text classif
 - explicit support for binary, multiclass, and multilabel problems.
 - a thin Python wrapper for invoking trained models
 
+## Why?
+
+I like tools like [vw](https://vowpalwabbit.org/) and [fastText](https://fasttext.cc/), and I wanted my own spin on it.
+Too often I find myself using scikit's TF-IDF and Logistic Regression, and while they're good, they require python.
+This toolkit is CLI first, with the option to invoke a model from Python.
+For datasets that fit on one machine, this toolkit will work just fine.
+
+If you're looking for embeddings and transformers, this is not the toolkit for you.
+
 ## CLI Usage
 
 Train and evaluate use TSV files with a header and `label\ttext` rows.
@@ -68,14 +77,6 @@ are at least `0.5`. Use `predict_labels()` when you always want a list.
 The wrapper also exposes `n_classes()`, `is_binary()`, `is_multilabel()`, and
 `is_calibrated()`.
 
-## Why?
-
-I like tools like [vw](https://vowpalwabbit.org/) and [fastText](https://fasttext.cc/), and I wanted my own spin on it.
-Too often I find myself using scikit's TF-IDF and Logistic Regression, and while they're good, they require python.
-This toolkit is CLI first, with the option to invoke a model from Python.
-For datasets that fit on one machine, this toolkit will work just fine.
-
-If you're looking for embeddings and transformers, this is not the toolkit for you.
 
 ## References
 
