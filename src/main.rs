@@ -412,7 +412,6 @@ fn do_predict(args: &cli::PredictArgs) {
 
     let mut writer = std::io::BufWriter::new(out);
 
-    let is_binary = model.classifier.is_binary();
     let has_calibrator = model.calibrator.is_some();
 
     writeln!(writer, "label\tprobability").unwrap();
@@ -421,14 +420,17 @@ fn do_predict(args: &cli::PredictArgs) {
     for line in std::io::BufReader::new(input).lines() {
         let text = line.unwrap();
         let features = model.tfidf.transform(&text);
-        let (pred, probs) = model.predict_features_with_proba(&features);
-        let probability = if is_binary {
-            if pred == 1 { probs[0] } else { 1.0 - probs[0] }
-        } else {
-            probs[pred]
-        };
+        let predictions = model.predict_features_labels_with_proba(&features);
+        let labels: Vec<String> = predictions
+            .iter()
+            .map(|(label, _)| label.to_string())
+            .collect();
+        let probabilities: Vec<String> = predictions
+            .iter()
+            .map(|(_, probability)| format!("{:.6}", probability))
+            .collect();
 
-        writeln!(writer, "{}\t{:.6}", pred, probability).unwrap();
+        writeln!(writer, "{}\t{}", labels.join(","), probabilities.join(",")).unwrap();
         n_samples += 1;
     }
 

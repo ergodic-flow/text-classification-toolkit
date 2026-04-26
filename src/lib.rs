@@ -49,15 +49,37 @@ impl Model {
     }
 
     pub fn predict_features_labels(&self, features: &[(usize, f64)]) -> Vec<usize> {
+        self.predict_features_labels_with_proba(features)
+            .into_iter()
+            .map(|(label, _)| label)
+            .collect()
+    }
+
+    pub fn predict_features_labels_with_proba(
+        &self,
+        features: &[(usize, f64)],
+    ) -> Vec<(usize, f64)> {
         let probs = self.predict_features_proba(features);
         match &self.classifier {
             Classifier::OvaSgd(_) | Classifier::OvaLbfgs(_) => probs
                 .iter()
                 .enumerate()
                 .filter(|&(_, &prob)| prob >= 0.5)
-                .map(|(idx, _)| idx)
+                .map(|(idx, &prob)| (idx, prob))
                 .collect(),
-            _ => vec![predict_from_proba(&probs, self.classifier.is_binary())],
+            _ => {
+                let pred = predict_from_proba(&probs, self.classifier.is_binary());
+                let probability = if self.classifier.is_binary() {
+                    if pred == 1 {
+                        probs.first().copied().unwrap_or(0.0)
+                    } else {
+                        1.0 - probs.first().copied().unwrap_or(0.0)
+                    }
+                } else {
+                    probs.get(pred).copied().unwrap_or(0.0)
+                };
+                vec![(pred, probability)]
+            }
         }
     }
 }
@@ -192,6 +214,12 @@ mod tests {
         assert!(probs[0] > 0.5);
         assert!(probs[1] > 0.5);
         assert!(probs.iter().sum::<f64>() > 1.0);
-        assert_eq!(model.predict_features_labels(&[]), vec![0, 1]);
+
+        let predictions = model.predict_features_labels_with_proba(&[]);
+        assert_eq!(predictions.len(), 2);
+        assert_eq!(predictions[0].0, 0);
+        assert_eq!(predictions[1].0, 1);
+        assert!(predictions[0].1 > 0.5);
+        assert!(predictions[1].1 > 0.5);
     }
 }
