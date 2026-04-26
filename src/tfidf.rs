@@ -140,7 +140,8 @@ impl TfIdf {
 
         for (i, (term, df, _tf)) in vocab_list.into_iter().enumerate() {
             self.vocab.insert(term, i);
-            self.idf.push((1.0 + n_docs / (1.0 + df as f64)).ln() + 1.0);
+            self.idf
+                .push(((1.0 + n_docs) / (1.0 + df as f64)).ln() + 1.0);
         }
     }
 
@@ -216,5 +217,47 @@ impl TfIdf {
             rv[idx] = Some(term.clone());
         }
         rv
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TfIdf;
+
+    fn feature_value(features: &[(usize, f64)], idx: usize) -> f64 {
+        features
+            .iter()
+            .find_map(|&(feature_idx, value)| (feature_idx == idx).then_some(value))
+            .unwrap_or(0.0)
+    }
+
+    #[test]
+    fn smooth_idf_gives_ubiquitous_terms_idf_one() {
+        let docs = ["common rare", "common", "common"];
+        let mut tfidf = TfIdf::new();
+        tfidf.fit(&docs);
+
+        let common_idx = tfidf.vocab["common"];
+        let rare_idx = tfidf.vocab["rare"];
+
+        assert!((tfidf.idf[common_idx] - 1.0).abs() < 1e-12);
+        assert!((tfidf.idf[rare_idx] - (2.0_f64.ln() + 1.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn transform_uses_smooth_idf_weights() {
+        let docs = ["common rare", "common", "common"];
+        let mut tfidf = TfIdf::new();
+        tfidf.fit(&docs);
+
+        let common_idx = tfidf.vocab["common"];
+        let rare_idx = tfidf.vocab["rare"];
+        let features = tfidf.transform("common rare");
+
+        let rare_idf = 2.0_f64.ln() + 1.0;
+        let norm = (1.0 + rare_idf * rare_idf).sqrt();
+
+        assert!((feature_value(&features, common_idx) - (1.0 / norm)).abs() < 1e-12);
+        assert!((feature_value(&features, rare_idx) - (rare_idf / norm)).abs() < 1e-12);
     }
 }
