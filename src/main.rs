@@ -421,8 +421,7 @@ fn do_predict(args: &cli::PredictArgs) {
     for line in std::io::BufReader::new(input).lines() {
         let text = line.unwrap();
         let features = model.tfidf.transform(&text);
-        let pred = model.classifier.predict(&features);
-        let probs = model.predict_features_proba(&features);
+        let (pred, probs) = model.predict_features_with_proba(&features);
         let probability = if is_binary {
             if pred == 1 { probs[0] } else { 1.0 - probs[0] }
         } else {
@@ -941,7 +940,7 @@ fn do_evaluate(args: &cli::EvaluateArgs) {
 
     for (label, text) in &data {
         let features = model.tfidf.transform(text);
-        let predicted = model.classifier.predict_labels(&features);
+        let predicted = model.predict_features_labels(&features);
         let actual = parse_labels(label, is_binary);
         report.record(&predicted, &actual);
     }
@@ -986,12 +985,12 @@ fn do_repl(args: &cli::ReplArgs) {
         }
 
         let features = model.tfidf.transform(text);
-        let pred = model.classifier.predict(&features);
-        let probs = model.predict_features_proba(&features);
+        let (pred, probs) = model.predict_features_with_proba(&features);
         let mut contribs = model.classifier.feature_contributions(&features);
 
         if model.classifier.is_binary() {
-            println!("predicted: {} (prob: {:.4})", pred, probs[0]);
+            let probability = if pred == 1 { probs[0] } else { 1.0 - probs[0] };
+            println!("predicted: {} (prob: {:.4})", pred, probability);
         } else {
             let prob_strs: Vec<String> = probs
                 .iter()
