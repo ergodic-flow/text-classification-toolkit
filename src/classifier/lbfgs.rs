@@ -40,7 +40,8 @@ impl LbfgsClassifier {
         }
     }
 
-    /// Evaluates the total loss and gradient over the entire dataset using precomputed weights
+    /// Evaluates the total loss and gradient over the entire dataset using precomputed weights.
+    /// Scratch buffers are supplied by the caller because line search evaluates this repeatedly.
     fn evaluate(
         &self,
         x: &[f64],
@@ -49,11 +50,18 @@ impl LbfgsClassifier {
         weights: &[f64],
         sum_weights: f64,
         l2_reg: f64,
-    ) -> (f64, Vec<f64>) {
+        grad: &mut [f64],
+        z_scores: &mut [f64],
+        exps: &mut [f64],
+    ) -> f64 {
         let n_classes = self.n_classes;
         let w_len = self.weights.len();
-        let mut grad = vec![0.0; x.len()];
         let mut total_loss = 0.0;
+
+        debug_assert_eq!(grad.len(), x.len());
+        debug_assert_eq!(z_scores.len(), n_classes);
+        debug_assert_eq!(exps.len(), n_classes);
+        grad.fill(0.0);
 
         let w = &x[0..w_len];
         let b = &x[w_len..];
@@ -67,7 +75,7 @@ impl LbfgsClassifier {
                 continue;
             }
 
-            let mut z_scores = b.to_vec();
+            z_scores.copy_from_slice(b);
 
             for &(feat_idx, val) in feat {
                 let w_offset = feat_idx * n_classes;
@@ -112,7 +120,6 @@ impl LbfgsClassifier {
                 Objective::Multinomial { .. } => {
                     let max_z = z_scores.iter().copied().fold(f64::NEG_INFINITY, f64::max);
                     let mut sum_exp = 0.0;
-                    let mut exps = vec![0.0; n_classes];
 
                     for k in 0..n_classes {
                         let e = (z_scores[k] - max_z).exp();
@@ -153,7 +160,7 @@ impl LbfgsClassifier {
             total_loss += 0.5 * l2_reg * l2_loss;
         }
 
-        (total_loss, grad)
+        total_loss
     }
 
     pub fn train(
@@ -190,13 +197,21 @@ impl LbfgsClassifier {
         let mut x = self.weights.clone();
         x.extend_from_slice(&self.biases);
 
-        let (mut f, mut g) = self.evaluate(
+        let mut g = vec![0.0; x.len()];
+        let mut g_new = vec![0.0; x.len()];
+        let mut z_scores = vec![0.0; self.n_classes];
+        let mut exps = vec![0.0; self.n_classes];
+
+        let mut f = self.evaluate(
             &x,
             features,
             labels,
             &effective_weights,
             sum_weights,
             l2_reg,
+            &mut g,
+            &mut z_scores,
+            &mut exps,
         );
 
         let mut s_hist: Vec<Vec<f64>> = Vec::with_capacity(m);
@@ -272,23 +287,23 @@ impl LbfgsClassifier {
 
             let mut x_new = vec![0.0; x.len()];
             let mut f_new = 0.0;
-            let mut g_new = vec![];
 
             for _ in 0..20 {
                 for j in 0..x.len() {
                     x_new[j] = x[j] + alpha * p[j];
                 }
 
-                let (f_val, g_val) = self.evaluate(
+                f_new = self.evaluate(
                     &x_new,
                     features,
                     labels,
                     &effective_weights,
                     sum_weights,
                     l2_reg,
+                    &mut g_new,
+                    &mut z_scores,
+                    &mut exps,
                 );
-                f_new = f_val;
-                g_new = g_val;
 
                 if f_new > f + c1 * alpha * g0_dot_p {
                     alpha_max = alpha;
@@ -326,7 +341,7 @@ impl LbfgsClassifier {
 
             x = x_new;
             f = f_new;
-            g = g_new;
+            std::mem::swap(&mut g, &mut g_new);
             pb.set_message(format!("{:.6}", f));
             pb.inc(1);
         }
