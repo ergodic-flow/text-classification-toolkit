@@ -12,7 +12,6 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     Train(TrainArgs),
-    Tune(TuneArgs),
     Predict(PredictArgs),
     Evaluate(EvaluateArgs),
     Repl(ReplArgs),
@@ -86,24 +85,6 @@ pub struct TrainArgs {
 
     #[arg(long, default_value_t = 10)]
     pub lbfgs_memory: usize,
-
-    #[arg(long, default_value_t = 1e-6)]
-    pub lbfgs_tol: f64,
-}
-
-#[derive(Args)]
-pub struct TuneArgs {
-    #[command(flatten)]
-    pub model: ModelArgs,
-
-    #[arg(long, default_value_t = 0.0)]
-    pub l2_reg: f64,
-
-    #[arg(long, default_value_t = 5)]
-    pub folds: usize,
-
-    #[arg(long, default_value_t = 50)]
-    pub trials: usize,
 
     #[arg(long, default_value_t = 1e-6)]
     pub lbfgs_tol: f64,
