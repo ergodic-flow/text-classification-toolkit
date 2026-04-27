@@ -301,7 +301,7 @@ fn do_train(args: &cli::TrainArgs) {
                 sample_weights.as_deref(),
                 args.l2_reg,
                 args.sgd_learning_rate,
-                args.max_iter,
+                args.sgd_epochs,
                 args.sgd_batch_size,
             );
             Classifier::OvaSgd(ova)
@@ -330,7 +330,7 @@ fn do_train(args: &cli::TrainArgs) {
                 sample_weights.as_deref(),
                 args.l2_reg,
                 args.lbfgs_memory,
-                args.max_iter,
+                args.lbfgs_max_iter,
                 args.lbfgs_tol,
             );
             Classifier::OvaLbfgs(ova)
@@ -351,7 +351,7 @@ fn do_train(args: &cli::TrainArgs) {
                 cw.as_deref(),
                 args.l2_reg,
                 args.sgd_learning_rate,
-                args.max_iter,
+                args.sgd_epochs,
                 args.sgd_batch_size,
             );
             Classifier::Sgd(clf)
@@ -372,7 +372,7 @@ fn do_train(args: &cli::TrainArgs) {
                 cw.as_deref(),
                 args.l2_reg,
                 args.lbfgs_memory,
-                args.max_iter,
+                args.lbfgs_max_iter,
                 args.lbfgs_tol,
             );
             Classifier::Lbfgs(clf)

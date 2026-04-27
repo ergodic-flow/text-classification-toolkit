@@ -80,8 +80,11 @@ pub struct TrainArgs {
     #[arg(long, default_value_t = 32)]
     pub sgd_batch_size: usize,
 
+    #[arg(long, default_value_t = 5)]
+    pub sgd_epochs: usize,
+
     #[arg(long, default_value_t = 1000)]
-    pub max_iter: usize,
+    pub lbfgs_max_iter: usize,
 
     #[arg(long, default_value_t = 10)]
     pub lbfgs_memory: usize,
