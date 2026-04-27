@@ -446,6 +446,10 @@ fn do_evaluate(args: &cli::EvaluateArgs) {
     let data = read_tsv(&args.input);
 
     let is_binary = model.classifier.is_binary();
+    let is_multilabel = matches!(
+        model.classifier,
+        Classifier::OvaSgd(_) | Classifier::OvaLbfgs(_)
+    );
     let n_classes = model.classifier.n_classes();
     let mut report = ClassificationReport::new(n_classes);
 
@@ -456,7 +460,7 @@ fn do_evaluate(args: &cli::EvaluateArgs) {
         report.record(&predicted, &actual);
     }
 
-    let report = report.format_report(&args.format);
+    let report = report.format_report(&args.format, is_multilabel);
 
     match &args.report {
         Some(path) => fs::write(path, &report).unwrap(),
