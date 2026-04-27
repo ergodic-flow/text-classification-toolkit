@@ -29,8 +29,8 @@ mod tests {
 
         let text = report.format_report(&ReportFormat::Text, false);
 
-        assert!(text.contains("     micro avg       0.67      0.50      0.57         3"));
-        assert!(text.contains("   samples avg       0.50      0.50      0.50         3"));
+        assert!(text.contains("     micro avg       0.67      0.50      0.57         4"));
+        assert!(text.contains("   samples avg       0.50      0.50      0.50         4"));
         assert!(!text.contains("accuracy"));
     }
 
@@ -44,11 +44,28 @@ mod tests {
         let json = report.format_report(&ReportFormat::Json, false);
 
         assert!(json.contains(
-            "\"micro_avg\":{\"precision\":0.6667,\"recall\":0.5000,\"f1_score\":0.5714,\"support\":3}"
+            "\"micro_avg\":{\"precision\":0.6667,\"recall\":0.5000,\"f1_score\":0.5714,\"support\":4}"
         ));
         assert!(json.contains(
-            "\"samples_avg\":{\"precision\":0.5000,\"recall\":0.5000,\"f1_score\":0.5000,\"support\":3}"
+            "\"samples_avg\":{\"precision\":0.5000,\"recall\":0.5000,\"f1_score\":0.5000,\"support\":4}"
         ));
+    }
+
+    #[test]
+    fn aggregate_support_counts_labels_not_samples() {
+        let mut report = ClassificationReport::new(3);
+        report.record(&[0, 1], &[0, 1]);
+        report.record(&[2], &[2]);
+
+        let text = report.format_report(&ReportFormat::Text, true);
+        let json = report.format_report(&ReportFormat::Json, true);
+
+        assert!(text.contains("     micro avg       1.00      1.00      1.00         3"));
+        assert!(text.contains("   samples avg       1.00      1.00      1.00         3"));
+        assert!(json.contains(
+            "\"micro_avg\":{\"precision\":1.0000,\"recall\":1.0000,\"f1_score\":1.0000,\"support\":3}"
+        ));
+        assert!(json.contains("\"total_samples\":2"));
     }
 
     #[test]
@@ -289,6 +306,10 @@ impl ClassificationReport {
             / total_support as f64
     }
 
+    fn total_support(&self) -> usize {
+        self.support.iter().sum()
+    }
+
     pub fn format_report(&self, fmt: &ReportFormat, include_multilabel_metrics: bool) -> String {
         match fmt {
             ReportFormat::Text => self.format_text(include_multilabel_metrics),
@@ -322,7 +343,7 @@ impl ClassificationReport {
 
         writeln!(out).unwrap();
 
-        let total = self.total_samples;
+        let total = self.total_support();
         writeln!(
             out,
             "{:>14}  {:>9.2} {:>9.2} {:>9.2} {:>9}",
@@ -405,19 +426,19 @@ impl ClassificationReport {
             self.micro_precision(),
             self.micro_recall(),
             self.micro_f1(),
-            self.total_samples,
+            self.total_support(),
             self.macro_avg(|k| self.precision(k)),
             self.macro_avg(|k| self.recall(k)),
             self.macro_avg(|k| self.f1(k)),
-            self.total_samples,
+            self.total_support(),
             self.weighted_avg(|k| self.precision(k)),
             self.weighted_avg(|k| self.recall(k)),
             self.weighted_avg(|k| self.f1(k)),
-            self.total_samples,
+            self.total_support(),
             self.samples_avg_precision(),
             self.samples_avg_recall(),
             self.samples_avg_f1(),
-            self.total_samples,
+            self.total_support(),
             self.total_samples,
         )
     }
